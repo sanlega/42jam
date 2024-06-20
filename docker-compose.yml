@@ -3,7 +3,7 @@ version: '3.8'
 services:
   frontend:
     build:
-      context: ./chat-game
+      context: ./game
       dockerfile: Dockerfile
     ports:
       - "3000:5000"
@@ -16,6 +16,6 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
-    environment:
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    # env_file:
+    #   - .env
 
