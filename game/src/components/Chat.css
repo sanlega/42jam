@@ -42,3 +42,31 @@ button:hover {
   background-color: #0056b3;
 }
 
+/* Responsive Styles */
+@media (max-width: 600px) {
+  .chat-container {
+    width: 100%;
+    height: 100vh;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+  }
+
+  .messages {
+    padding: 10px;
+  }
+
+  .input-container {
+    padding: 10px;
+  }
+
+  input {
+    padding: 10px;
+    margin-right: 5px;
+  }
+
+  button {
+    padding: 10px;
+  }
+}
+

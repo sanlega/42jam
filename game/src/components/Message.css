@@ -2,6 +2,8 @@
   padding: 10px;
   margin: 5px 0;
   border-radius: 5px;
+  max-width: 80%; /* Ensure messages don't take up the full width */
+  word-wrap: break-word; /* Break long words to fit in the container */
 }
 
 .message.user {
@@ -12,5 +14,12 @@
 .message.npc {
   background-color: #f1f1f1;
   align-self: flex-start;
+}
+
+/* Responsive Styles */
+@media (max-width: 600px) {
+  .message {
+    max-width: 100%; /* Adjust max-width for smaller screens */
+  }
 }
 
