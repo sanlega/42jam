@@ -10,6 +10,9 @@ export const initWebSocket = (onMessage) => {
   websocket.onmessage = (event) => {
     const message = JSON.parse(event.data);
     onMessage(message);
+    if (message.status) {
+      websocket.close();  // Close the connection if the game has ended
+    }
   };
 
   websocket.onerror = (error) => {

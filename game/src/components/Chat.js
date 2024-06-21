@@ -11,14 +11,20 @@ function Chat() {
   const [power, setPower] = useState(10);
   const [currentDay, setCurrentDay] = useState(1);
   const [messagesSent, setMessagesSent] = useState(0);
+  const [gameStatus, setGameStatus] = useState(null);
 
   useEffect(() => {
     const websocket = initWebSocket((message) => {
-      setMessages((prev) => [...prev, { text: message.message, from: 'npc' }]);
-      setHealth(message.health);
-      setPower(message.power);
-      setCurrentDay(message.currentDay);
-      setMessagesSent(message.messagesSent);
+      if (message.status) {
+        setGameStatus(message.status);
+        setMessages((prev) => [...prev, { text: message.message, from: 'system' }]);
+      } else {
+        setMessages((prev) => [...prev, { text: message.message, from: 'npc' }]);
+        setHealth(message.health);
+        setPower(message.power);
+        setCurrentDay(message.currentDay);
+        setMessagesSent(message.messagesSent);
+      }
     });
 
     return () => websocket.close();
@@ -38,14 +44,21 @@ function Chat() {
             <Message key={index} message={msg} />
           ))}
         </div>
-        <div className="input-container">
-          <input 
-            value={input} 
-            onChange={(e) => setInput(e.target.value)} 
-            placeholder="Type a message" 
-          />
-          <button onClick={handleSendMessage}>Send</button>
-        </div>
+        {gameStatus ? (
+          <div className="game-over">
+            <h2>Game Over</h2>
+            <p>{messages[messages.length - 1].text}</p>
+          </div>
+        ) : (
+          <div className="input-container">
+            <input 
+              value={input} 
+              onChange={(e) => setInput(e.target.value)} 
+              placeholder="Type a message" 
+            />
+            <button onClick={handleSendMessage}>Send</button>
+          </div>
+        )}
       </div>
       <StatusPanel 
         health={health} 

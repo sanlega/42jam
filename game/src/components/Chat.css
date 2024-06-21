@@ -80,23 +80,16 @@ button:hover {
   background-color: #66b2ff;
 }
 
-/* Responsive Styles */
-@media (max-width: 600px) {
-  .chat-container {
-    flex-direction: column;
-  }
+.game-over {
+  text-align: center;
+  padding: 20px;
+}
 
-  .chat-box {
-    flex: none;
-    width: 100%;
-  }
+.game-over h2 {
+  font-size: 24px;
+  color: red;
+}
 
-  .status-panel {
-    flex: none;
-    width: 100%;
-    margin-left: 0;
-    border-left: none;
-    border-top: 1px solid #ccc;
-    margin-top: 10px;
-  }
+.game-over p {
+  font-size: 18px;
 }
