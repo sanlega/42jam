@@ -2,6 +2,8 @@ fastapi
 uvicorn
 openai
 python-dotenv
-langchain
-langchain[llms]
-langchain-core
+langchain==0.1.17
+langchain-community
+langchain-openai
+pydantic
+asyncio

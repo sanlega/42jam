@@ -1,97 +1,82 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from pydantic import BaseModel
-from typing import Dict
-from langchain.chains import ConversationChain
-from langchain.memory import ConversationBufferMemory
-from langchain.llms import OpenAI
-from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 import os
+from dotenv import load_dotenv
 import openai
-import random
+import json
 
-from .models import Player, Checkpoint
-from .game_logic import process_game_logic
-
-app = FastAPI()
-
+# Load environment variables
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Initialize LangChain Conversation with Buffer Memory and OpenAI LLM
-memory = ConversationBufferMemory()
-llm = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-conversation = ConversationChain(memory=memory, llm=llm)
+# Initialize FastAPI app
+app = FastAPI()
 
-# In-memory store for players
-players: Dict[int, Player] = {}
+# Allow all CORS requests
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
-# Define initial game state and checkpoints
-initial_health = 100
-initial_power = 10
-total_days = 7
-messages_per_day = 5
+# Sample player data, usually this would be more dynamic
+player_info = {
+    "health": 100,
+    "power": 50,
+    "message": ""
+}
 
-checkpoints = [
-    Checkpoint(day=1, boss_health=50, boss_power=10),
-    Checkpoint(day=3, boss_health=100, boss_power=20),
-    Checkpoint(day=7, boss_health=200, boss_power=30)
-]
-
-# Helper function to get or create a player
-def get_or_create_player(player_id: int) -> Player:
-    if player_id not in players:
-        players[player_id] = Player(id=player_id, health=initial_health, power=initial_power, current_day=1, messages_sent_today=0)
-    return players[player_id]
-
-@app.websocket("/ws/{player_id}")
-async def websocket_endpoint(websocket: WebSocket, player_id: int):
+# WebSocket endpoint
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    player = get_or_create_player(player_id)
+    print("WebSocket connection accepted")
 
     try:
         while True:
-            data = await websocket.receive_text()
-            
-            if player.messages_sent_today >= messages_per_day:
-                await websocket.send_text("You have reached the message limit for today. Proceed to the next day.")
-                continue
-            
-            response = conversation.predict(input=data, context=player.dict())
-            player.messages_sent_today += 1
+            try:
+                # Receive message from the front end
+                data = await websocket.receive_text()
+                print(f"Received data: {data}")
 
-            response, player = process_game_logic(response, player)
+                if not data:  # Check if data is empty
+                    print("Received empty data string.")
+                    continue  # Skip processing if data is empty
 
-            if player.health <= 0:
-                response = "You have died. Game over."
-                await websocket.send_text(response)
+                try:
+                    user_input = json.loads(data)
+                except json.JSONDecodeError as e:
+                    print(f"Error decoding JSON: {e}")
+                    await websocket.send_json({"error": "Invalid JSON format"})
+                    continue  # Skip processing if JSON is malformed
+
+                message = user_input.get("message")
+                if not message:
+                    print("No message provided in the input")
+                    await websocket.send_json({"error": "No message provided"})
+                    continue  # Skip processing if message is empty
+
+                # Generate a response using OpenAI GPT-4
+                response = openai.ChatCompletion.create(
+                    model="gpt-4",
+                    messages=[
+                        {"role": "system", "content": "You are in a dark cave."},
+                        {"role": "user", "content": message}
+                    ]
+                )
+                reply = response['choices'][0]['message']['content']
+
+                # Update player's message from GPT-4 response
+                player_info["message"] = reply
+
+                # Send updated player info back to the client
+                await websocket.send_json(player_info)
+            except WebSocketDisconnect:
+                print("Client disconnected")
                 break
+    except Exception as e:
+        print(f"Unhandled exception: {e}")
 
-            await websocket.send_text(response)
-            
-            if player.messages_sent_today >= messages_per_day:
-                for checkpoint in checkpoints:
-                    if checkpoint.day == player.current_day:
-                        rng = random.randint(0, 10)
-                        if player.power >= checkpoint.boss_power and player.health >= checkpoint.boss_health - rng:
-                            response = f"Checkpoint {checkpoint.day} completed. Proceed to the next day."
-                        else:
-                            response = f"You failed to complete checkpoint {checkpoint.day}. Game over."
-                            await websocket.send_text(response)
-                            break
-
-                player.current_day += 1
-                player.messages_sent_today = 0
-
-    except WebSocketDisconnect:
-        await websocket.close()
-
-@app.get("/player/{player_id}", response_model=Player)
-async def get_player(player_id: int):
-    player = get_or_create_player(player_id)
-    return player
-
-@app.post("/player/{player_id}/reset")
-async def reset_player(player_id: int):
-    players[player_id] = Player(id=player_id, health=initial_health, power=initial_power, current_day=1, messages_sent_today=0)
-    return {"message": "Player reset successfully"}
-
+# Run this using Uvicorn command: uvicorn main:app --reload

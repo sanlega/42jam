@@ -1,0 +1,31 @@
+.status-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  border-left: 1px solid #ccc;
+  margin-left: 10px;
+}
+
+.status-item {
+  margin-bottom: 20px;
+}
+
+.status-bar {
+  width: 100%;
+  background-color: #e0e0e0;
+  border-radius: 5px;
+  overflow: hidden;
+  height: 20px;
+}
+
+.status-fill {
+  height: 100%;
+}
+
+.status-fill.health {
+  background-color: #ff6666;
+}
+
+.status-fill.power {
+  background-color: #66b2ff;
+}
