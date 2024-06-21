@@ -2,24 +2,32 @@
   padding: 10px;
   margin: 5px 0;
   border-radius: 5px;
-  max-width: 80%; /* Ensure messages don't take up the full width */
-  word-wrap: break-word; /* Break long words to fit in the container */
+  max-width: 80%;
+  word-wrap: break-word;
 }
 
 .message.user {
-  background-color: #e0f7fa;
+  background-color: #ffe4c4;
   align-self: flex-end;
+  border: 1px solid #8B4513;
 }
 
 .message.npc {
-  background-color: #f1f1f1;
+  background-color: #f5f5dc;
   align-self: flex-start;
+  border: 1px solid #8B4513;
+}
+
+.message.system {
+  background-color: #8B4513;
+  align-self: center;
+  color: white;
+  border: 1px solid #8B4513;
 }
 
 /* Responsive Styles */
 @media (max-width: 600px) {
   .message {
-    max-width: 100%; /* Adjust max-width for smaller screens */
+    max-width: 100%;
   }
 }
-

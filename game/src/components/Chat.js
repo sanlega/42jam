@@ -12,6 +12,7 @@ function Chat() {
   const [currentDay, setCurrentDay] = useState(1);
   const [messagesSent, setMessagesSent] = useState(0);
   const [gameStatus, setGameStatus] = useState(null);
+  const [gameStarted, setGameStarted] = useState(false);
 
   useEffect(() => {
     const websocket = initWebSocket((message) => {
@@ -36,9 +37,17 @@ function Chat() {
     setInput('');
   };
 
+  const handleStartGame = () => {
+    setGameStarted(true);
+    sendMessage("start", health, power, currentDay, messagesSent);
+  };
+
   return (
     <div className="chat-container">
       <div className="chat-box">
+        <div className="header">
+          <h1>Castle</h1>
+        </div>
         <div className="messages">
           {messages.map((msg, index) => (
             <Message key={index} message={msg} />
@@ -49,7 +58,7 @@ function Chat() {
             <h2>Game Over</h2>
             <p>{messages[messages.length - 1].text}</p>
           </div>
-        ) : (
+        ) : gameStarted ? (
           <div className="input-container">
             <input 
               value={input} 
@@ -58,15 +67,22 @@ function Chat() {
             />
             <button onClick={handleSendMessage}>Send</button>
           </div>
+        ) : (
+          <div className="start-container">
+            <button onClick={handleStartGame}>Start Game</button>
+          </div>
         )}
       </div>
-      <StatusPanel 
-        health={health} 
-        power={power} 
-        currentDay={currentDay} 
-        messagesSent={messagesSent} 
-        messagesPerDay={5} 
-      />
+      <div className="side-panel">
+        <div className="image-box"></div>
+        <StatusPanel 
+          health={health} 
+          power={power} 
+          currentDay={currentDay} 
+          messagesSent={messagesSent} 
+          messagesPerDay={5} 
+        />
+      </div>
     </div>
   );
 }
