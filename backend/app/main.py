@@ -66,9 +66,9 @@ def check_game_end_conditions(health, current_day):
     if health is None or current_day is None:
         return None, None
     if health <= 0:
-        return "lose", "Your health has reached 0. You have lost the game."
+        return "lose", "Tu salud ha llegado a 0. Has perdido el juego."
     elif current_day > MAX_DAYS:
-        return "win" if health > 50 else "lose", "You have reached the end of the game." + (" You win!" if health > 50 else " You lose!")
+        return "win" if health > 50 else "lose", "Has llegado al final del juego." + (" ¡Has ganado!" if health > 50 else " Has perdido.")
     return None, None
 
 def ensure_valid_values(health, power):
@@ -77,8 +77,6 @@ def ensure_valid_values(health, power):
     if power is not None:
         power = max(0, min(power, MAX_POWER))
     return health, power
-
-# ... existing imports and setup ...
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -100,7 +98,7 @@ async def websocket_endpoint(websocket: WebSocket):
             else:
                 # Send initial prompt
                 initial_prompt = {
-                    "message": "Greetings, adventurer! Welcome to the realm of Eldoria. Your journey begins at the edge of the Whispering Woods. What do you wish to do first?",
+                    "message": "¡Saludos, aventurero! Bienvenido al reino de Eldoria. Tu viaje comienza en el borde del Bosque Susurrante. ¿Qué deseas hacer primero?",
                     "health": health,
                     "power": power,
                     "currentDay": current_day,
@@ -124,56 +122,66 @@ async def websocket_endpoint(websocket: WebSocket):
                 logging.info(f"Game end condition met: {end_message}")
                 break
             
-            # Process the game logic
-            system_prompt = (
-                f"You are a game master in a fantasy RPG. Guide the player through their adventure, "
-                f"providing challenges, story development, and responses based on their input. Include necessary "
-                f"game logic and calculations. The current game state is: Day {current_day}, Health {health}, Power {power}, "
-                f"Messages sent today {messages_sent}. You will always respond only in JSON format with 3 fields: "
-                f"'message' containing the response text telling the story, 'health' with a number if the story "
-                f"needs the user to receive damage or healing (ensure health never goes over 100), and 'power' with "
-                f"a number indicating any change in the player's power. Do not reset health or power unless specified."
-                f"If asked about the current health or power, respond with the current value without modifying it."
-            )
+            def generate_system_prompt():
+                return (
+                    f"Eres un maestro del juego en un RPG de fantasía. Guía al jugador a través de su aventura, "
+                    f"proporcionando desafíos, desarrollo de la historia y respuestas basadas en su entrada. Incluye la lógica "
+                    f"del juego y los cálculos necesarios. El estado actual del juego es: Día {current_day}, Salud {health}, Poder {power}, "
+                    f"Mensajes enviados hoy {messages_sent}. Siempre responderás solo en formato JSON con 3 campos: "
+                    f"'message' que contiene el texto de la respuesta contando la historia, 'health' con un número, si el numero no varía en cuanto al número de {health}, mantelo como está si la historia "
+                    f"necesita que el usuario reciba daño o curación (asegúrate de que la salud nunca supere 100), y 'power' con "
+                    f"un número que tienes que tener en cuenta el número actual {power}, que indique cualquier cambio en el poder del jugador. No restablezcas la salud o el poder a menos que se especifique."
+                    f"Si se pregunta sobre la salud o el poder actual, responde con el valor actual sin modificarlo. "
+                    f"Si el jugador toma decisiones muy malas, puede morir. "
+                    f"Es muy importante que uses los valores actuales (health: {health} y power: {power}) de salud y poder para cualquier actualización y no los restablezcas. Si los modificas, en la respuesta formato JSON que devuelvas actualizalos, solo pueden ser 0 si el usuario ha muerto por alguna razón de la trama del juego o por una muy mala decisión. "
+                    f"Solo responde en formato JSON. No incluyas ninguna explicación adicional, solo el JSON."
+                )
 
-            completion = openai.chat.completions.create(
-                model="gpt-4-turbo",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    *manager.message_history[websocket],
-                    {"role": "user", "content": message_data['message']}
-                ]
-            )
+            retries = 3
+            while retries > 0:
+                retries -= 1
+                system_prompt = generate_system_prompt()
+                completion = openai.chat.completions.create(
+                    model="gpt-4-turbo",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        *manager.message_history[websocket],
+                        {"role": "user", "content": message_data['message']}
+                    ]
+                )
 
-            # Log GPT response to console and file
-            gpt_response = completion.choices[0].message.content
-            logging.info(f"GPT Response: {gpt_response}")
-            print("GPT Response:", gpt_response)
-            
-            # Parse the GPT response
-            try:
-                reply = json.loads(gpt_response)
-                health = reply.get("health", health)
-                power = reply.get("power", power)
-                health, power = ensure_valid_values(health, power)
-                game_state = {
-                    "message": reply["message"],
-                    "health": health,
-                    "power": power,
-                    "currentDay": current_day,
-                    "messagesSent": messages_sent + 1
-                }
-                # Add GPT response to history
-                manager.add_message_to_history(websocket, "assistant", reply["message"])
-            except (json.JSONDecodeError, KeyError) as e:
-                logging.error(f"Error processing GPT response: {e}")
-                game_state = {
-                    "message": "Oh oh... El maestro ha perdido la conexión espiritual",
-                    "health": health,
-                    "power": power,
-                    "currentDay": current_day,
-                    "messagesSent": messages_sent
-                }
+                # Log GPT response to console and file
+                gpt_response = completion.choices[0].message.content
+                logging.info(f"GPT Response: {gpt_response}")
+                print("GPT Response:", gpt_response)
+                
+                # Parse the GPT response
+                try:
+                    reply = json.loads(gpt_response)
+                    health = reply.get("health", health)
+                    power = reply.get("power", power)
+                    health, power = ensure_valid_values(health, power)
+                    game_state = {
+                        "message": reply["message"],
+                        "health": health,
+                        "power": power,
+                        "currentDay": current_day,
+                        "messagesSent": messages_sent + 1
+                    }
+                    # Add GPT response to history
+                    manager.add_message_to_history(websocket, "assistant", reply["message"])
+                    break  # Exit retry loop if successful
+                except (json.JSONDecodeError, KeyError) as e:
+                    logging.error(f"Error processing GPT response: {e}")
+                    logging.error(f"GPT Raw Response: {gpt_response}")
+                    if retries == 0:
+                        game_state = {
+                            "message": "Hubo un error procesando la respuesta del maestro del juego.",
+                            "health": health,
+                            "power": power,
+                            "currentDay": current_day,
+                            "messagesSent": messages_sent
+                        }
 
             await manager.send_personal_message(json.dumps(game_state), websocket)
     except WebSocketDisconnect:
