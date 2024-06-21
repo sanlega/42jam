@@ -1,9 +1,4 @@
 fastapi
 uvicorn
-openai
 python-dotenv
-langchain==0.1.17
-langchain-community
-langchain-openai
-pydantic
-asyncio
+openai>=1.0.0

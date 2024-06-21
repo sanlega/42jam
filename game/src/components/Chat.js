@@ -13,14 +13,12 @@ function Chat() {
   const [messagesSent, setMessagesSent] = useState(0);
 
   useEffect(() => {
-    const playerId = 1; // Replace this with the actual logic to get the player ID
-    const websocket = initWebSocket(playerId, (message) => {
-      const data = JSON.parse(message);
-      setMessages((prev) => [...prev, { text: data.message, from: 'npc' }]);
-      setHealth(data.health);
-      setPower(data.power);
-      setCurrentDay(data.currentDay);
-      setMessagesSent(data.messagesSent);
+    const websocket = initWebSocket((message) => {
+      setMessages((prev) => [...prev, { text: message.message, from: 'npc' }]);
+      setHealth(message.health);
+      setPower(message.power);
+      setCurrentDay(message.currentDay);
+      setMessagesSent(message.messagesSent);
     });
 
     return () => websocket.close();
@@ -28,7 +26,7 @@ function Chat() {
 
   const handleSendMessage = () => {
     setMessages((prev) => [...prev, { text: input, from: 'user' }]);
-    sendMessage(input);
+    sendMessage(input, health, power, currentDay, messagesSent);
     setInput('');
   };
 

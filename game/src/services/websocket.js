@@ -23,9 +23,9 @@ export const initWebSocket = (onMessage) => {
   return websocket;
 };
 
-export const sendMessage = (message) => {
+export const sendMessage = (message, health, power, currentDay, messagesSent) => {
   if (websocket && websocket.readyState === WebSocket.OPEN) {
-    const data = JSON.stringify({ message });
+    const data = JSON.stringify({ message, health, power, currentDay, messagesSent });
     websocket.send(data);
   }
 };
