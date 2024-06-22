@@ -9,6 +9,10 @@ export const initWebSocket = (onMessage) => {
 
   websocket.onmessage = (event) => {
     const message = JSON.parse(event.data);
+    // Filter out ping messages
+    if (message.ping) {
+      return;
+    }
     onMessage(message);
     if (message.status) {
       websocket.close();  // Close the connection if the game has ended

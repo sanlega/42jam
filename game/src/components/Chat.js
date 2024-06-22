@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Message from './Message';
 import StatusPanel from './StatusPanel';
 import { initWebSocket, sendMessage } from '../services/websocket';
@@ -13,6 +13,8 @@ function Chat() {
   const [messagesSent, setMessagesSent] = useState(0);
   const [gameStatus, setGameStatus] = useState(null);
   const [gameStarted, setGameStarted] = useState(false);
+
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
     const websocket = initWebSocket((message) => {
@@ -31,10 +33,20 @@ function Chat() {
     return () => websocket.close();
   }, []);
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
   const handleSendMessage = () => {
     setMessages((prev) => [...prev, { text: input, from: 'user' }]);
     sendMessage(input, health, power, currentDay, messagesSent);
     setInput('');
+  };
+
+  const handleKeyPress = (event) => {
+    if (event.key === 'Enter') {
+      handleSendMessage();
+    }
   };
 
   const handleStartGame = () => {
@@ -52,6 +64,7 @@ function Chat() {
           {messages.map((msg, index) => (
             <Message key={index} message={msg} />
           ))}
+          <div ref={messagesEndRef} />
         </div>
         {gameStatus ? (
           <div className="game-over">
@@ -63,6 +76,7 @@ function Chat() {
             <input 
               value={input} 
               onChange={(e) => setInput(e.target.value)} 
+              onKeyPress={handleKeyPress} // Add key press handler
               placeholder="Type a message" 
             />
             <button onClick={handleSendMessage}>Send</button>

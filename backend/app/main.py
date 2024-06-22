@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import json
 import logging
+import asyncio
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -89,6 +90,12 @@ def extract_json(response_text):
         return None
 
 async def handle_gpt_response(system_prompt, user_message, message_history, websocket, retries=3):
+    default_response = {
+        "message": "No se pudo procesar tu solicitud en este momento. Intenta nuevamente.",
+        "health": INITIAL_HEALTH,
+        "power": INITIAL_POWER
+    }
+
     while retries > 0:
         try:
             completion = openai.chat.completions.create(
@@ -112,7 +119,7 @@ async def handle_gpt_response(system_prompt, user_message, message_history, webs
                     return json_str
                 else:
                     system_prompt += (
-                        f" Recuerda, debes responder solo en formato JSON: {{\"message\": \"...\", \"health\": {message_history[-1].get('health', INITIAL_HEALTH)}, \"power\": {message_history[-1].get('power', INITIAL_POWER)}}}."
+                        f" Recuerda, debes responder solo en formato JSON: {{\"message\": \"...\", \"health\": {message_history[-1].get('health', INITIAL_HEALTH)}, \"power\": {message_history[-1].get('power', INITIAL_POWER)}}}. POR FAVOR, usa este formato de JSON"
                     )
                     message_history.append({"role": "system", "content": system_prompt})
                     retries -= 1
@@ -120,7 +127,8 @@ async def handle_gpt_response(system_prompt, user_message, message_history, webs
             logging.error(f"Error during GPT response handling: {e}")
             retries -= 1
 
-    raise ValueError("Maximum retries exceeded. Unable to get a valid JSON response.")
+    logging.warning("Maximum retries exceeded. Returning default response.")
+    return default_response
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -128,10 +136,21 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         # Initial prompt to start the game
         initial_prompt = (
-            "¡Saludos, aventurero! Bienvenido al reino de Eldoria. Tu viaje comienza en el borde del Bosque Susurrante. ¿Qué deseas hacer primero?"
+            "¡Saludos, aventurero! Bienvenido al 42º reino. Tu viaje comienza en el borde del Bosque Trepidante cerca de un Poblado. ¿Qué deseas hacer primero?"
         )
         manager.add_message_to_history(websocket, "assistant", initial_prompt)
         await manager.send_personal_message(json.dumps({"message": initial_prompt}), websocket)
+
+        # Keep-alive task
+        async def keep_alive():
+            while True:
+                await asyncio.sleep(30)  # Send a ping every 30 seconds
+                try:
+                    await websocket.send_text(json.dumps({"ping": "keep-alive"}))
+                except WebSocketDisconnect:
+                    break
+
+        keep_alive_task = asyncio.create_task(keep_alive())
 
         while True:
             data = await websocket.receive_text()
@@ -177,7 +196,7 @@ async def websocket_endpoint(websocket: WebSocket):
             try:
                 reply = await handle_gpt_response(system_prompt, message_data['message'], manager.message_history[websocket], websocket)
             except ValueError:
-                game_state = {
+                reply = {
                     "message": "Hubo un error procesando la respuesta del maestro del juego.",
                     "status": "error",
                     "health": health,
@@ -185,9 +204,6 @@ async def websocket_endpoint(websocket: WebSocket):
                     "currentDay": current_day,
                     "messagesSent": messages_sent
                 }
-                await manager.send_personal_message(json.dumps(game_state), websocket)
-                logging.info("Failed to get a valid JSON response after maximum retries.")
-                break
             
             if reply.get("health") is not None and reply.get("power") is not None:
                 health = reply["health"]
@@ -210,6 +226,7 @@ async def websocket_endpoint(websocket: WebSocket):
             await manager.send_personal_message(json.dumps(game_state), websocket)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+        keep_alive_task.cancel()
 
 if __name__ == "__main__":
     import uvicorn
