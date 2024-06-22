@@ -88,10 +88,8 @@ def extract_json(response_text):
         logging.error(f"Error extracting JSON: {e}")
         return None
 
-async def handle_gpt_response(system_prompt, user_message, message_history, websocket):
-    retries = 0
-    max_retries = 3
-    while retries < max_retries:
+async def handle_gpt_response(system_prompt, user_message, message_history, websocket, retries=3):
+    while retries > 0:
         try:
             completion = openai.chat.completions.create(
                 model="gpt-4-turbo",
@@ -113,14 +111,14 @@ async def handle_gpt_response(system_prompt, user_message, message_history, webs
                 if json_str:
                     return json_str
                 else:
-                    retries += 1
                     system_prompt += (
-                        f" Por favor, responde solo en el siguiente formato JSON: {{\"message\": \"...\", \"health\": {message_history[-1].get('health', INITIAL_HEALTH)}, \"power\": {message_history[-1].get('power', INITIAL_POWER)}}}."
+                        f" Recuerda, debes responder solo en formato JSON: {{\"message\": \"...\", \"health\": {message_history[-1].get('health', INITIAL_HEALTH)}, \"power\": {message_history[-1].get('power', INITIAL_POWER)}}}."
                     )
                     message_history.append({"role": "system", "content": system_prompt})
+                    retries -= 1
         except Exception as e:
             logging.error(f"Error during GPT response handling: {e}")
-            retries += 1
+            retries -= 1
 
     raise ValueError("Maximum retries exceeded. Unable to get a valid JSON response.")
 
@@ -165,17 +163,15 @@ async def websocket_endpoint(websocket: WebSocket):
 
             # System prompt
             system_prompt = (
-                f"Eres un maestro del juego en un RPG de fantasía. Guía al jugador a través de su aventura, "
+                f"Eres un maestro del juego en un RPG de fantasía que responderá en formato JSON. Guía al jugador a través de su aventura, "
                 f"proporcionando desafíos, desarrollo de la historia y respuestas basadas en su entrada. Incluye la lógica "
                 f"del juego y los cálculos necesarios. El estado actual del juego es: Día {current_day}, Salud {health}, Poder {power}, "
-                f"Mensajes enviados hoy {messages_sent}. Prefiere responder en formato JSON con 3 campos: "
-                f"'message' que contiene el texto de la respuesta contando la historia, 'health' con un número que indica "
-                f"la salud actual (asegúrate de que la salud nunca supere 100), y 'power' con un número que indica cualquier "
-                f"cambio en el poder del jugador. No restablezcas la salud o el poder a menos que se especifique."
+                f"Mensajes enviados hoy {messages_sent}. Debes responder solo en el siguiente formato JSON: "
+                f"{{\"message\": \"...\", \"health\": {health}, \"power\": {power}}}. No restablezcas la salud o el poder a menos que se especifique."
                 f"Si se pregunta sobre la salud o el poder actual, responde con el valor actual sin modificarlo."
                 f"Si el jugador toma decisiones muy malas, puede morir."
                 f"Es muy importante que uses los valores actuales de salud {health} y poder {power} para cualquier actualización. "
-                f"Si no puedes proporcionar una respuesta clara, indica 'error' en el campo de mensaje."
+                f"Si no puedes proporcionar una respuesta clara, indica 'error' en el campo de mensaje. Y recuerda el formato JSON mencionado"
             )
 
             try:
@@ -193,9 +189,14 @@ async def websocket_endpoint(websocket: WebSocket):
                 logging.info("Failed to get a valid JSON response after maximum retries.")
                 break
             
-            health = reply.get("health", health)
-            power = reply.get("power", power)
-            health, power = ensure_valid_values(health, power)
+            if reply.get("health") is not None and reply.get("power") is not None:
+                health = reply["health"]
+                power = reply["power"]
+                health, power = ensure_valid_values(health, power)
+            else:
+                # If response is not JSON or lacks health/power, treat it as a plain message
+                reply = {"message": reply.get("message", gpt_response), "health": health, "power": power}
+
             game_state = {
                 "message": reply["message"],
                 "health": health,
